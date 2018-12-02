@@ -3,16 +3,21 @@ import matplotlib.pyplot as plt
 
 dec_acc_cosine = np.load("decoder_accuracies_cosine.npy")
 dec_acc_l2 = np.load("decoder_accuracies_L2.npy")
+trip_acc_cosine = np.load("3let_decoder_accuracies_cosine.npy")
 
 dec_losses_cosine = np.load("decoder_losses_cosine.npy")
 dec_losses_l2 = np.load("decoder_losses_L2.npy")
+trip_losses_cosine = np.load("3let_decoder_losses_cosine.npy")
 
 enc_losses_cosine = np.load("encoder_losses_cosine.npy")
 enc_losses_l2 = np.load("encoder_losses_L2.npy")
+trip_losses_cosine = np.load("3let_encoder_losses_cosine.npy")
+
 
 fig = plt.figure()
 plt.plot(dec_acc_cosine,label="cosine")
 plt.plot(dec_acc_l2,label="L2")
+# plt.plot(trip_acc_cosine,label="3let cosine")
 plt.xlabel("Step")
 plt.ylabel("Accuracy")
 plt.title("Decoder Accuracy")
@@ -23,6 +28,7 @@ plt.close(fig)
 fig = plt.figure()
 plt.plot(dec_losses_cosine,label="cosine")
 plt.plot(dec_losses_l2,label="L2")
+# plt.plot(trip_losses_cosine,label="3let cosine")
 plt.xlabel("Step")
 plt.ylabel("Cross Entropy Loss")
 plt.title("Decoder Cross Entropy Loss")
@@ -45,3 +51,12 @@ plt.ylabel("MSE Distance")
 plt.title("Encoder L2 Loss")
 plt.savefig("encoder_loss_l2_plot.png")
 plt.close(fig)
+
+# fig = plt.figure()
+# plt.plot(trip_losses_cosine)
+# plt.xlabel("Step")
+# plt.ylabel("Triplet Cosine Distance")
+# plt.title("Encoder Triplet Cosine Loss")
+# plt.savefig("encoder_loss_triplet_cosine.png")
+# plt.close(fig)
+

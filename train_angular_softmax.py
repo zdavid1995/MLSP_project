@@ -26,6 +26,7 @@ train_decoder_period = 1
 emb_dim = 256
 epochs = 100
 num_classes = 10
+update_targets_period = 1
 
 
 train_loader = torchvision.datasets.CIFAR10(os.getcwd(),download=True)
@@ -35,7 +36,6 @@ print(train_data.shape)
 train_labels = np.array(train_loader.train_labels)
 train_len = len(train_data)
 train_targets = np.arange(train_len)
-# train_targets = create_targets(train_len,emb_dim)
 
 test_loader = torchvision.datasets.CIFAR10(os.getcwd(),download=True,train=False)
 test_data = test_loader.test_data.transpose((0,3,1,2))
@@ -68,6 +68,16 @@ if cuda:
 writer = SummaryWriter(log_dir="./logs")
 
 
+
+def calc_optimal_target_permutation(as_feats, targets,angle_loss):
+	cost_matrix = np.zeros((len(as_feats[0]),len(targets)))
+	n_targets = torch.LongTensor(targets).detach()
+	for i in range(len(as_feats)):
+		cost_matrix[:,i] = angle_loss((as_feats[0].detach(),as_feats[1].detach()),n_targets[i].repeat(len(as_feats[0]))).detach().numpy()
+	_, col_ind = scipy.optimize.linear_sum_assignment(cost_matrix)
+	targets[range(as_feats[0].shape[0])] = targets[col_ind]
+	return targets
+
 def train():
 	enc_losses = []
 	dec_losses = []
@@ -76,6 +86,7 @@ def train():
 	steps = 0
 	for epoch in range(epochs):
 		scheduler.step(epoch)
+		update_targets = bool(((epoch+1) % update_targets_period) == 0)
 		train_decoder = bool(((epoch+1) % train_decoder_period) == 0)
 		encoder.train()
 		r_idx = np.random.permutation(train_len)
@@ -88,16 +99,18 @@ def train():
 				X = X.cuda()
 			encoder_optim.zero_grad()
 			outputs_enc = encoder(X)
-			outputs_as = as_decoder(output_enc)
+			outputs_as = as_decoder(outputs_enc)
+			if update_targets:
+				train_targets[r_idx[i:i+bsz]] = calc_optimal_target_permutation(outputs_as,train_targets[r_idx[i:i+bsz]],encoder_loss_fn)
 			targets = torch.LongTensor(train_targets[r_idx[i:i+bsz]])
 			if cuda:
 				targets = targets.cuda()
-			encoder_loss = encoder_loss_fn(output_as, targets)
+
+			encoder_loss = encoder_loss_fn(outputs_as, targets)
 			encoder_loss.backward(retain_graph=True)
 			encoder_optim.step()
 
 			if i % 100 == 0:
-				# idx_step = int(((epoch+1)/train_decoder_period)*(i/100))
 				writer.add_scalar('encoder_loss', encoder_loss.item(),steps)
 				enc_losses.append(encoder_loss.item())
 			if train_decoder:
@@ -111,7 +124,6 @@ def train():
 				decoder_optim.step()
 
 				if i % 100 == 0:
-					# idx_step = int(((epoch+1)/train_decoder_period)*(i/100))
 					writer.add_scalar('decoder_loss', decoder_loss.item(),steps)
 					dec_losses.append(decoder_loss.item())
 			steps += 1

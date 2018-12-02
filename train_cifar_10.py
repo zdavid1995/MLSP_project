@@ -163,7 +163,6 @@ def train():
 			targets = torch.FloatTensor(train_targets[r_idx[i:i+bsz]])
 			if cuda:
 				targets = targets.cuda()
-			# train encoder
 			if triplet:
 				encoder_loss = triplet_loss(outputs,targets,encoder_loss_fn)
 			else:
@@ -172,7 +171,6 @@ def train():
 			encoder_optim.step()
 
 			if i % 100 == 0:
-				# idx_step = int(((epoch+1)/train_decoder_period)*(i/100))
 				writer.add_scalar('encoder_loss', encoder_loss.item(),steps)
 				enc_losses.append(encoder_loss.item())
 			if train_decoder:
