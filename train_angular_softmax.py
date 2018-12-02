@@ -22,7 +22,7 @@ learning_rate = 1e-3
 batch_size = 128
 im_grayscale = True
 im_gradient = True
-train_decoder_period = 5
+train_decoder_period = 1
 emb_dim = 256
 epochs = 100
 num_classes = 10
@@ -87,11 +87,12 @@ def train():
 			if cuda:
 				X = X.cuda()
 			encoder_optim.zero_grad()
-			outputs = as_decoder(encoder(X))
+			outputs_enc = encoder(X)
+			outputs_as = as_decoder(output_enc)
 			targets = torch.LongTensor(train_targets[r_idx[i:i+bsz]])
 			if cuda:
 				targets = targets.cuda()
-			encoder_loss = encoder_loss_fn(outputs, targets)
+			encoder_loss = encoder_loss_fn(output_as, targets)
 			encoder_loss.backward(retain_graph=True)
 			encoder_optim.step()
 
@@ -104,7 +105,7 @@ def train():
 				if cuda:
 					y = y.cuda()
 				decoder_optim.zero_grad()
-				logits = decoder(outputs)
+				logits = decoder(outputs_enc)
 				decoder_loss = decoder_loss_fn(logits, y)
 				decoder_loss.backward()
 				decoder_optim.step()
@@ -144,14 +145,10 @@ def train():
 			torch.save(encoder.state_dict(),"ENC_STATE.pt")
 			torch.save(decoder.state_dict(),"DEC_STATE.pt")
 
-		if not use_cosine:
-			np.save("decoder_accuracies_L2.npy",np.array(dec_accs))
-			np.save("decoder_losses_L2.npy",np.array(dec_losses))
-			np.save("encoder_losses_L2.npy",np.array(enc_losses))
-		else:
-			np.save("decoder_accuracies_cosine.npy",np.array(dec_accs))
-			np.save("decoder_losses_cosine.npy",np.array(dec_losses))
-			np.save("encoder_losses_cosine.npy",np.array(enc_losses))
+
+		np.save("decoder_accuracies_angular.npy",np.array(dec_accs))
+		np.save("decoder_losses_angular.npy",np.array(dec_losses))
+		np.save("encoder_losses_angular.npy",np.array(enc_losses))
 			# state = {
 			# 		'encoder_state_dict': encoder.state_dict(),
 			# 		'decoder_state_dict': decoder.state_dict(),
