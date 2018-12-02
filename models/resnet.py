@@ -202,7 +202,7 @@ class ResNet(nn.Module):
 
 class Decoder(nn.Module):
 
-	def __init__(self,input_shape=512,nhid=256,num_classes=257):
+	def __init__(self,input_shape=512,nhid=256,num_classes=10):
 		super().__init__()
 		self.classifier = []
 		self.classifier.append(nn.Linear(input_shape, nhid))
