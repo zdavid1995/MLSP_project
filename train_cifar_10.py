@@ -19,11 +19,12 @@ learning_rate = 1e-3
 batch_size = 128
 im_grayscale = True
 im_gradient = True
-update_targets_period = 3
+update_targets_period = 5
 train_decoder_period = 10
 emb_dim = 256
 epochs = 100
 num_classes = 10
+use_cosine = True
 
 # NEED ALEXNET AND IMAGENET
 def create_targets(n,emb_dim):
@@ -42,11 +43,14 @@ def image_transforms():
 	im_transforms.append(transforms.ToTensor())
 	return transforms.Compose(im_transforms)
 
+
 transform_obj = image_transforms()
 encoder = AlexNetFeatureNet(im_grayscale=im_grayscale,im_gradients=im_gradient)
 decoder = Decoder(num_classes=num_classes)
 encoder_loss_fn = nn.MSELoss()
+encoder_closs_fn = nn.CosineSimilarity()
 decoder_loss_fn = nn.CrossEntropyLoss()
+
 
 if cuda:
 	encoder.cuda()
@@ -65,7 +69,7 @@ train_loader = torchvision.datasets.CIFAR10(os.getcwd(),download=True,transform=
 train_data = train_loader.train_data.transpose((0,3,1,2))
 train_data = np.expand_dims(train_data.sum(axis=1)/3,1)
 print(train_data.shape)
-train_labels = train_loader.train_labels
+train_labels = np.array(train_loader.train_labels)
 train_len = len(train_data)
 train_targets = create_targets(train_len,emb_dim)
 
@@ -74,7 +78,7 @@ test_loader = torchvision.datasets.CIFAR10(os.getcwd(),download=True,train=False
 test_data = test_loader.test_data.transpose((0,3,1,2))
 test_data = np.expand_dims(test_data.sum(axis=1)/3,1)
 print(test_data.shape)
-test_labels = test_loader.test_labels
+test_labels = np.array(test_loader.test_labels)
 test_len = len(test_data)
 
 writer = SummaryWriter(log_dir="./logs")
@@ -104,6 +108,7 @@ def train():
 	dec_losses = []
 	dec_accs = []
 	best_accuracy = 0
+	steps = 0
 	for epoch in range(epochs):
 		scheduler.step(epoch)
 		update_targets = bool(((epoch+1) % update_targets_period) == 0)
@@ -132,15 +137,17 @@ def train():
 			if cuda:
 				targets = targets.cuda()
 			# train encoder
-			encoder_loss = encoder_loss_fn(outputs, targets)
+			if not use_cosine:
+				encoder_loss = encoder_loss_fn(outputs, targets)
+			else:
+				encoder_loss = (1 - encoder_closs_fn(outputs,targets)).sum()/bsz
 			encoder_loss.backward(retain_graph=True)
 			encoder_optim.step()
 
 			if i % 100 == 0:
 				# idx_step = int(((epoch+1)/train_decoder_period)*(i/100))
-				writer.add_scalar('encoder_loss', encoder_loss.item())
+				writer.add_scalar('encoder_loss', encoder_loss.item(),steps)
 				enc_losses.append(encoder_loss.item())
-
 			if train_decoder:
 				y = torch.LongTensor(train_labels[r_idx[i:i+bsz]])
 				if cuda:
@@ -153,9 +160,9 @@ def train():
 
 				if i % 100 == 0:
 					# idx_step = int(((epoch+1)/train_decoder_period)*(i/100))
-					writer.add_scalar('decoder_loss', decoder_loss.item())
+					writer.add_scalar('decoder_loss', decoder_loss.item(),steps)
 					dec_losses.append(decoder_loss.item())
-
+			steps += 1
 		# set models to eval mode and validate on test set.
 		encoder.eval()
 		decoder.eval()
@@ -177,7 +184,7 @@ def train():
 			n_correct += sum(preds == test_labels[i:i+bsz])
 
 		accuracy = float(n_correct)/float(test_len)
-		writer.add_scalar('accuracy', accuracy)
+		writer.add_scalar('accuracy',accuracy,steps)
 		dec_accs.append(accuracy)
 
 		if accuracy > best_accuracy:
@@ -185,11 +192,15 @@ def train():
 			print(f'saving best encoder / decoder pair....',accuracy)
 			torch.save(encoder.state_dict(),"ENC_STATE.pt")
 			torch.save(decoder.state_dict(),"DEC_STATE.pt")
-		np.save("decoder_accuracies",np.array(dec_accs))
-		np.save("decoder_losses.npy",np.array(dec_losses))
-		np.save("encoder_losses.npy",np.array(enc_losses))
+		if not use_cosine:
+			np.save("decoder_accuracies_L2.npy",np.array(dec_accs))
+			np.save("decoder_losses_L2.npy",np.array(dec_losses))
+			np.save("encoder_losses_L2.npy",np.array(enc_losses))
+		else:
+			np.save("decoder_accuracies_cosine.npy",np.array(dec_accs))
+			np.save("decoder_losses_cosine.npy",np.array(dec_losses))
+			np.save("encoder_losses_consine.npy",np.array(enc_losses))
 			# state = {
-
 			# 		'encoder_state_dict': encoder.state_dict(),
 			# 		'decoder_state_dict': decoder.state_dict(),
 
