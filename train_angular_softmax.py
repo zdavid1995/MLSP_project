@@ -22,11 +22,11 @@ learning_rate = 1e-3
 batch_size = 128
 im_grayscale = True
 im_gradient = True
-train_decoder_period = 1
+train_decoder_period = 10
 emb_dim = 256
 epochs = 100
 num_classes = 10
-update_targets_period = 1
+update_targets_period = 5
 
 
 train_loader = torchvision.datasets.CIFAR10(os.getcwd(),download=True)
@@ -72,8 +72,10 @@ writer = SummaryWriter(log_dir="./logs")
 def calc_optimal_target_permutation(as_feats, targets,angle_loss):
 	cost_matrix = np.zeros((len(as_feats[0]),len(targets)))
 	n_targets = torch.LongTensor(targets).detach()
+	if cuda:
+		n_targets = n_targets.cuda()
 	for i in range(len(as_feats)):
-		cost_matrix[:,i] = angle_loss((as_feats[0].detach(),as_feats[1].detach()),n_targets[i].repeat(len(as_feats[0]))).detach().numpy()
+		cost_matrix[:,i] = angle_loss((as_feats[0].detach(),as_feats[1].detach()),n_targets[i].repeat(len(as_feats[0]))).detach().cpu().numpy()
 	_, col_ind = scipy.optimize.linear_sum_assignment(cost_matrix)
 	targets[range(as_feats[0].shape[0])] = targets[col_ind]
 	return targets
