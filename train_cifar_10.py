@@ -11,6 +11,8 @@ from tensorboardX import SummaryWriter
 import torchvision.transforms as transforms
 import torchvision.datasets
 from models.alexnet import *
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics.pairwise import euclidean_distances
 
 
 cuda = torch.cuda.is_available()
@@ -116,10 +118,13 @@ def calc_optimal_target_permutation(feats, targets):
 	:return: the targets reassigned such that the SSE between features and targets is minimised for the batch.
 	"""
 	# Compute cost matrix
-	cost_matrix = np.zeros([feats.shape[0], targets.shape[0]])
-	# calc SSE between all features and targets
-	for i in range(feats.shape[0]):
-		cost_matrix[:, i] = np.sum(np.square(feats-targets[i, :]), axis=1)
+	# cost_matrix = np.zeros([feats.shape[0], targets.shape[0]])
+	if not use_cosine:
+		# for i in range(feats.shape[0]):
+		# 	cost_matrix[:, i] = np.sum(np.square(feats-targets[i, :]), axis=1)
+		cost_matrix = euclidean_distances(feats,targets)
+	else:
+		cost_matrix = 1 - cosine_similaritiy(feats,targets)
 	# Permute the targets based on hungarian algorithm optimisation
 	_, col_ind = scipy.optimize.linear_sum_assignment(cost_matrix)
 	targets[range(feats.shape[0])] = targets[col_ind]
