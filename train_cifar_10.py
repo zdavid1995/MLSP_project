@@ -21,12 +21,12 @@ learning_rate = 1e-3
 batch_size = 128
 im_grayscale = True
 im_gradient = True
-update_targets_period = 1
+update_targets_period = 5
 train_decoder_period = 10
 emb_dim = 256
 epochs = 100
 num_classes = 10
-use_cosine = True
+use_cosine = False
 triplet = True
 
 
@@ -45,7 +45,7 @@ def triplet_loss(embeddings,targets,criterion,margin=0.5):
 		negative_distance += t_loss.sum()/len(targets)
 		negative_distance += t_loss.sum()/len(targets)
 	positive_distance = criterion(embeddings,targets).sum()/len(targets)
-	return positive_distance - negative_distance + margin
+	return torch.nn.functional.relu(positive_distance - negative_distance + margin)
 
 
 
@@ -124,7 +124,7 @@ def calc_optimal_target_permutation(feats, targets):
 		# 	cost_matrix[:, i] = np.sum(np.square(feats-targets[i, :]), axis=1)
 		cost_matrix = euclidean_distances(feats,targets)
 	else:
-		cost_matrix = 1 - cosine_similaritiy(feats,targets)
+		cost_matrix = 1 - cosine_similarity(feats,targets)
 	# Permute the targets based on hungarian algorithm optimisation
 	_, col_ind = scipy.optimize.linear_sum_assignment(cost_matrix)
 	targets[range(feats.shape[0])] = targets[col_ind]
