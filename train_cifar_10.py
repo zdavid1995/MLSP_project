@@ -19,14 +19,35 @@ learning_rate = 1e-3
 batch_size = 128
 im_grayscale = True
 im_gradient = True
-update_targets_period = 5
+update_targets_period = 1
 train_decoder_period = 10
 emb_dim = 256
 epochs = 100
 num_classes = 10
 use_cosine = True
+triplet = True
 
-# NEED ALEXNET AND IMAGENET
+
+class CosineLoss(nn.Module):
+	def __init__(self):
+		super(CosineLoss,self).__init__()
+		self.loss_fn = nn.CosineSimilarity()
+	def forward(self,embeddings,targets):
+		return 1 - self.loss_fn(embeddings,targets)
+
+def triplet_loss(embeddings,targets,criterion,margin=0.5):
+	negative_distance = 0
+	for i,emb in enumerate(embeddings):
+		t_loss = criterion(emb.unsqueeze(0).repeat((len(targets)),1),targets)
+		t_loss[i] = 0
+		negative_distance += t_loss.sum()/len(targets)
+		negative_distance += t_loss.sum()/len(targets)
+	positive_distance = criterion(embeddings,targets).sum()/len(targets)
+	return positive_distance - negative_distance + margin
+
+
+
+
 def create_targets(n,emb_dim):
 	targets = np.random.normal(0,1,(n,emb_dim))
 	t_norms = np.expand_dims(np.linalg.norm(targets,axis=1),1)
@@ -47,8 +68,11 @@ def image_transforms():
 transform_obj = image_transforms()
 encoder = AlexNetFeatureNet(im_grayscale=im_grayscale,im_gradients=im_gradient)
 decoder = Decoder(num_classes=num_classes)
-encoder_loss_fn = nn.MSELoss()
-encoder_closs_fn = nn.CosineSimilarity()
+if not use_cosine:
+	encoder_loss_fn = nn.MSELoss(reduce=False)
+else:
+	encoder_loss_fn = CosineLoss()
+# encoder_closs_fn = nn.CosineSimilarity()
 decoder_loss_fn = nn.CrossEntropyLoss()
 
 
@@ -65,7 +89,6 @@ scheduler = torch.optim.lr_scheduler.MultiStepLR(encoder_optim, milestones=[10, 
 
 
 train_loader = torchvision.datasets.CIFAR10(os.getcwd(),download=True,transform=image_transforms())
-# train_data = DataLoader(train_loader,batch_size=batch_size,shuffle=True)
 train_data = train_loader.train_data.transpose((0,3,1,2))
 train_data = np.expand_dims(train_data.sum(axis=1)/3,1)
 print(train_data.shape)
@@ -74,7 +97,6 @@ train_len = len(train_data)
 train_targets = create_targets(train_len,emb_dim)
 
 test_loader = torchvision.datasets.CIFAR10(os.getcwd(),download=True,train=False,transform=image_transforms())
-# test_data = DataLoader(test_loader,batch_size=batch_size,shuffle=False)
 test_data = test_loader.test_data.transpose((0,3,1,2))
 test_data = np.expand_dims(test_data.sum(axis=1)/3,1)
 print(test_data.shape)
@@ -137,10 +159,10 @@ def train():
 			if cuda:
 				targets = targets.cuda()
 			# train encoder
-			if not use_cosine:
-				encoder_loss = encoder_loss_fn(outputs, targets)
+			if triplet:
+				encoder_loss = triplet_loss(outputs,targets,encoder_loss_fn)
 			else:
-				encoder_loss = (1 - encoder_closs_fn(outputs,targets)).sum()/bsz
+				encoder_loss = encoder_loss_fn(outputs, targets).sum()/bsz
 			encoder_loss.backward(retain_graph=True)
 			encoder_optim.step()
 
@@ -192,14 +214,15 @@ def train():
 			print(f'saving best encoder / decoder pair....',accuracy)
 			torch.save(encoder.state_dict(),"ENC_STATE.pt")
 			torch.save(decoder.state_dict(),"DEC_STATE.pt")
+		prepend = "3let_" if triplet else ""
 		if not use_cosine:
-			np.save("decoder_accuracies_L2.npy",np.array(dec_accs))
-			np.save("decoder_losses_L2.npy",np.array(dec_losses))
-			np.save("encoder_losses_L2.npy",np.array(enc_losses))
+			np.save(prepend + "decoder_accuracies_L2.npy",np.array(dec_accs))
+			np.save(prepend + "decoder_losses_L2.npy",np.array(dec_losses))
+			np.save(prepend + "encoder_losses_L2.npy",np.array(enc_losses))
 		else:
-			np.save("decoder_accuracies_cosine.npy",np.array(dec_accs))
-			np.save("decoder_losses_cosine.npy",np.array(dec_losses))
-			np.save("encoder_losses_cosine.npy",np.array(enc_losses))
+			np.save(prepend + "decoder_accuracies_cosine.npy",np.array(dec_accs))
+			np.save(prepend + "decoder_losses_cosine.npy",np.array(dec_losses))
+			np.save(prepend + "encoder_losses_cosine.npy",np.array(enc_losses))
 			# state = {
 			# 		'encoder_state_dict': encoder.state_dict(),
 			# 		'decoder_state_dict': decoder.state_dict(),
