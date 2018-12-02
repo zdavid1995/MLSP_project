@@ -199,7 +199,7 @@ def train():
 		else:
 			np.save("decoder_accuracies_cosine.npy",np.array(dec_accs))
 			np.save("decoder_losses_cosine.npy",np.array(dec_losses))
-			np.save("encoder_losses_consine.npy",np.array(enc_losses))
+			np.save("encoder_losses_cosine.npy",np.array(enc_losses))
 			# state = {
 			# 		'encoder_state_dict': encoder.state_dict(),
 			# 		'decoder_state_dict': decoder.state_dict(),
