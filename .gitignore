@@ -1,0 +1,8 @@
+*.DS_STORE
+*.png
+data
+logs
+cifar-100-python
+cifar-10-batches-py
+*.npy
+*.pyc
