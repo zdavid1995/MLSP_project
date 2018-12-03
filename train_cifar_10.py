@@ -37,15 +37,18 @@ class CosineLoss(nn.Module):
 	def forward(self,embeddings,targets):
 		return 1 - self.loss_fn(embeddings,targets)
 
-def triplet_loss(embeddings,targets,criterion,margin=0.5):
+def triplet_loss(embeddings,targets,criterion,alpha=1.5,beta=0.5):
 	negative_distance = 0
 	for i,emb in enumerate(embeddings):
 		t_loss = criterion(emb.unsqueeze(0).repeat((len(targets)),1),targets)
 		t_loss[i] = 0
-		negative_distance += t_loss.sum()/len(targets)
-		negative_distance += t_loss.sum()/len(targets)
+		negative_distance += t_loss.sum()/len(targets)/len(targets)
 	positive_distance = criterion(embeddings,targets).sum()/len(targets)
-	return torch.nn.functional.relu(positive_distance - negative_distance + margin)
+	#print(positive_distance)
+	#print(negative_distance)
+	tloss = alpha * positive_distance - beta * negative_distance
+	tloss = torch.nn.functional.relu(tloss)
+	return tloss
 
 
 
